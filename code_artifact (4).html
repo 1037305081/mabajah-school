@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام متابعة الحضور والغياب والتقارير - مدرسة ابن ماجه الابتدائية</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Lightweight Excel Processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chart.js for Visual Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Font Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                        }
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f8fafc;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; color: black; font-size: 10pt; }
+            .page-break { page-break-before: always; }
+        }
+        .print-only { display: none; }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+
+    <!-- Header Section -->
+    <header class="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/20">
+                        <i class="fa-solid fa-graduation-cap text-2xl text-emerald-300"></i>
+                    </div>
+                    <div>
+                        <span class="text-[11px] font-semibold text-emerald-200 block">إدارة التعليم بمنطقة حائل</span>
+                        <h1 class="text-xl font-bold tracking-tight">مدرسة ابن ماجه الابتدائية</h1>
+                        <p class="text-[11px] text-emerald-100/80">تطبيق إدارة الغياب اليومي والتقارير الإحصائية المتقدمة</p>
+                    </div>
+                </div>
+
+                <!-- Action Top Toolbar -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="switchTab('attendanceTab')" id="btnTabAttendance" class="bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/30">
+                        <i class="fa-solid fa-clipboard-user"></i>
+                        <span>التحضير اليومي</span>
+                    </button>
+                    <button onclick="switchTab('reportsTab')" id="btnTabReports" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/20">
+                        <i class="fa-solid fa-chart-column text-emerald-300"></i>
+                        <span>مركز التقارير والإحصائيات</span>
+                    </button>
+                    <button onclick="openClassManager()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border border-emerald-500/40">
+                        <i class="fa-solid fa-shapes"></i>
+                        <span>إدارة الفصول</span>
+                    </button>
+                    <button onclick="downloadSimplifiedExcelTemplate()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border border-white/20">
+                        <i class="fa-solid fa-file-excel text-emerald-300"></i>
+                        <span>نموذج الإكسل</span>
+                    </button>
+                    <label class="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition cursor-pointer flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-import"></i>
+                        <span>استيراد ملف الطلاب</span>
+                        <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex-grow w-full space-y-5">
+
+        <!-- TAB 1: DAILY ATTENDANCE & MESSAGING -->
+        <div id="attendanceTab" class="space-y-5">
+            <!-- Date & Quick Stats Bar -->
+            <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-center gap-3 no-print">
+                <div class="flex items-center space-x-3 space-x-reverse w-full md:w-auto">
+                    <div class="bg-emerald-50 p-2 rounded-xl text-emerald-700">
+                        <i class="fa-regular fa-calendar-check text-lg"></i>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500">تاريخ التحضير اليومي</label>
+                        <input type="date" id="selectedDate" onchange="onDateChange()" class="font-bold text-slate-800 bg-transparent border-none focus:ring-0 p-0 text-xs cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Stats Widgets -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full md:w-auto">
+                    <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-center">
+                        <span class="block text-[10px] text-slate-500 font-semibold">إجمالي الطلاب</span>
+                        <span id="statTotal" class="text-base font-bold text-slate-800">0</span>
+                    </div>
+                    <div class="bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 text-center">
+                        <span class="block text-[10px] text-emerald-700 font-semibold">حاضر</span>
+                        <span id="statPresent" class="text-base font-bold text-emerald-700">0</span>
+                    </div>
+                    <div class="bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 text-center">
+                        <span class="block text-[10px] text-rose-700 font-semibold">غائب بدون عذر</span>
+                        <span id="statAbsent" class="text-base font-bold text-rose-700">0</span>
+                    </div>
+                    <div class="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 text-center">
+                        <span class="block text-[10px] text-amber-700 font-semibold">بعذر / متأخر</span>
+                        <span id="statExcusedLate" class="text-base font-bold text-amber-700">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Class Filter Toolbar -->
+            <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200/80 no-print">
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <span class="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                        <i class="fa-solid fa-filter text-emerald-600"></i>
+                        تصفية حسب الفصل:
+                    </span>
+                    <button onclick="openClassManager()" class="text-xs text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-gear"></i>
+                        تعديل الفصول
+                    </button>
+                </div>
+                <div id="classFilterContainer" class="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                    <!-- Dynamic Buttons -->
+                </div>
+            </div>
+
+            <!-- Main Content Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 no-print">
+                <!-- Table Column -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="p-3.5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-2.5 bg-slate-50/50">
+                            <div class="relative w-full sm:w-64">
+                                <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input type="text" id="searchInput" oninput="renderStudentsTable()" placeholder="بحث باسم الطالب..." class="w-full pr-8 pl-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+                            </div>
+
+                            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                <select id="statusFilter" onchange="renderStudentsTable()" class="text-xs bg-white border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500">
+                                    <option value="ALL">جميع الحالات</option>
+                                    <option value="حاضر">حاضر فقط</option>
+                                    <option value="غائب">غائب بدون عذر</option>
+                                    <option value="غائب بعذر">غائب بعذر</option>
+                                    <option value="متأخر">متأخر</option>
+                                </select>
+                                <button onclick="openAddStudentModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1 shrink-0">
+                                    <i class="fa-solid fa-user-plus text-emerald-400"></i>
+                                    <span>إضافة طالب</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right text-xs">
+                                <thead class="bg-slate-100/70 text-slate-600 font-bold border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-2.5 px-3">اسم الطالب</th>
+                                        <th class="py-2.5 px-3">رقم الجوال</th>
+                                        <th class="py-2.5 px-3">الفصل</th>
+                                        <th class="py-2.5 px-3 text-center">حالة الحضور</th>
+                                        <th class="py-2.5 px-3 text-center">إشعار الواتساب</th>
+                                        <th class="py-2.5 px-3 text-center">خيارات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studentsTableBody" class="divide-y divide-slate-100">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                            <div id="emptyState" class="hidden py-10 text-center text-slate-400">
+                                <i class="fa-solid fa-user-slash text-3xl mb-2 text-slate-300"></i>
+                                <p class="text-xs font-semibold">لا يوجد طلاب مطابقين للبحث أو التصفية الحالية</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WhatsApp Sidebar Column -->
+                <div class="space-y-5">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-3">
+                        <div class="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                            <div class="bg-emerald-100 text-emerald-700 p-2 rounded-xl">
+                                <i class="fa-brands fa-whatsapp text-lg"></i>
+                            </div>
+                            <div>
+                                <h2 class="font-bold text-slate-800 text-xs">مركز رسائل الواتساب</h2>
+                                <p class="text-[10px] text-slate-400">إرسال إشعارات أولياء الأمور</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">اختر قالب الرسالة:</label>
+                            <select id="templateSelect" onchange="applyTemplate()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2 focus:outline-none focus:border-emerald-500">
+                                <option value="absent">إشعار غياب بدون عذر (رسمي)</option>
+                                <option value="excused">إشعار غائب بعذر</option>
+                                <option value="late">إشعار تأخر عن الدوام</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">نص الرسالة:</label>
+                            <textarea id="messageTemplateText" rows="4" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 leading-relaxed"></textarea>
+                        </div>
+
+                        <div class="space-y-2 pt-1">
+                            <button onclick="sendBatchWhatsApp('غائب')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                                <i class="fa-brands fa-whatsapp text-sm"></i>
+                                <span>إرسال لكافة الغائبين اليوم</span>
+                            </button>
+                            <button onclick="sendBatchWhatsApp('متأخر')" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center gap-2">
+                                <i class="fa-brands fa-whatsapp text-sm"></i>
+                                <span>إرسال للمتأخرين فقط</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-2">
+                        <h3 class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-export text-emerald-600"></i>
+                            التصدير السريع
+                        </h3>
+                        <button onclick="exportAnalyticsExcel()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-3 rounded-xl text-xs transition flex items-center justify-between">
+                            <span class="flex items-center gap-2">
+                                <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                                سحب بيانات اليوم (Excel)
+                            </span>
+                            <i class="fa-solid fa-chevron-left text-slate-400 text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: ADVANCED STATISTICAL REPORTS CENTER -->
+        <div id="reportsTab" class="hidden space-y-5">
+            
+            <!-- Controls & Timeframe Selector Header -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-4 no-print">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                        <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-600"></i>
+                            إدارة نطاق التقارير المتقدمة والتحليلات
+                        </h2>
+                        <p class="text-xs text-slate-500">اختر الفترة الزمنية والفصل لاستخراج الإحصائيات الشاملة</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="printOfficialReport()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-print"></i>
+                            <span>طباعة التقرير / تصدير PDF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Timeframe Selector Bar -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">نوع الفترة الزمنية:</label>
+                        <select id="timeframeType" onchange="onTimeframeTypeChange()" class="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl p-2 focus:outline-none focus:border-emerald-500">
+                            <option value="daily">يومي (تاريخ محدد)</option>
+                            <option value="weekly">أسبوعي (الأسبوع الحالي)</option>
+                            <option value="monthly">شهري (الشهر الحالي)</option>
+                            <option value="custom">تخصيص الفترة (من تاريخ -> إلى تاريخ)</option>
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Range Inputs -->
+                    <div id="dateFromContainer" class="block">
+                        <label id="dateFromLabel" class="block text-[11px] font-bold text-slate-600 mb-1">التاريخ:</label>
+                        <input type="date" id="reportDateFrom" onchange="generateReportData()" class="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl p-2 focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <div id="dateToContainer" class="hidden">
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">إلى تاريخ:</label>
+                        <input type="date" id="reportDateTo" onchange="generateReportData()" class="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl p-2 focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">تصفية الفصل:</label>
+                        <select id="reportClassFilter" onchange="generateReportData()" class="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl p-2 focus:outline-none focus:border-emerald-500">
+                            <!-- Dynamic Options -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Executive Summary Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 no-print">
+                <div class="bg-white p-3 rounded-2xl border border-slate-200/80 text-center shadow-sm">
+                    <span class="block text-[10px] text-slate-400 font-bold mb-1">أيام الدراسة</span>
+                    <span id="repDaysCount" class="text-lg font-extrabold text-slate-800">0</span>
+                    <span class="text-[9px] text-slate-400 block">يوم محضر</span>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-slate-200/80 text-center shadow-sm">
+                    <span class="block text-[10px] text-slate-400 font-bold mb-1">إجمالي الحالات</span>
+                    <span id="repTotalRecords" class="text-lg font-extrabold text-slate-800">0</span>
+                    <span class="text-[9px] text-slate-400 block">سجل</span>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-emerald-100 text-center shadow-sm bg-emerald-50/20">
+                    <span class="block text-[10px] text-emerald-700 font-bold mb-1">نسبة الانضباط</span>
+                    <span id="repAttendanceRate" class="text-lg font-extrabold text-emerald-700">100%</span>
+                    <span class="text-[9px] text-emerald-600 block">حضور منتظم</span>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-rose-100 text-center shadow-sm bg-rose-50/20">
+                    <span class="block text-[10px] text-rose-700 font-bold mb-1">حالات الغياب</span>
+                    <span id="repAbsentCount" class="text-lg font-extrabold text-rose-700">0</span>
+                    <span class="text-[9px] text-rose-600 block">بدون عذر</span>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-amber-100 text-center shadow-sm bg-amber-50/20">
+                    <span class="block text-[10px] text-amber-700 font-bold mb-1">الغياب بعذر</span>
+                    <span id="repExcusedCount" class="text-lg font-extrabold text-amber-700">0</span>
+                    <span class="text-[9px] text-amber-600 block">عذر مقبول</span>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-purple-100 text-center shadow-sm bg-purple-50/20">
+                    <span class="block text-[10px] text-purple-700 font-bold mb-1">حالات التأخر</span>
+                    <span id="repLateCount" class="text-lg font-extrabold text-purple-700">0</span>
+                    <span class="text-[9px] text-purple-600 block">تأخر صباحي</span>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 no-print">
+                <div class="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-2">
+                    <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-bar text-emerald-600"></i>
+                        مقارنة نسبة الغياب عبر كافة فصول المدرسة
+                    </h3>
+                    <div class="h-64 relative">
+                        <canvas id="reportClassesBarChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-2 flex flex-col justify-between">
+                    <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-pie text-emerald-600"></i>
+                        توزيع حالات الحضور والغياب
+                    </h3>
+                    <div class="h-56 relative my-auto">
+                        <canvas id="reportDoughnutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Tables -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 no-print">
+                <!-- Class-by-Class Ranking -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-3">
+                    <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-list-ol text-emerald-600"></i>
+                        ترتيب الفصول حسب حالات الغياب
+                    </h3>
+                    <div class="overflow-x-auto max-h-72 custom-scrollbar border rounded-xl">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-slate-100 text-slate-600 font-bold sticky top-0">
+                                <tr>
+                                    <th class="p-2">الفصل</th>
+                                    <th class="p-2 text-center">عدد الطلاب</th>
+                                    <th class="p-2 text-center">الغياب</th>
+                                    <th class="p-2 text-center">بعذر</th>
+                                    <th class="p-2 text-center">نسبة الحضور</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classRankingTableBody" class="divide-y divide-slate-100">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Student Frequent Absence Watchlist -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-3">
+                    <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+                        سجل الأكثر غياباً خلال الفترة (متابعة التوجيه الطلابي)
+                    </h3>
+                    <div class="overflow-x-auto max-h-72 custom-scrollbar border rounded-xl">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-slate-100 text-slate-600 font-bold sticky top-0">
+                                <tr>
+                                    <th class="p-2">اسم الطالب</th>
+                                    <th class="p-2">الفصل</th>
+                                    <th class="p-2 text-center">الغياب بدون عذر</th>
+                                    <th class="p-2 text-center">التأخر</th>
+                                </tr>
+                            </thead>
+                            <tbody id="frequentAbsenceTableBody" class="divide-y divide-slate-100">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OFFICIAL PRINT VIEW CONTAINER (PRINT / PDF) -->
+        <div id="officialPrintSection" class="print-only p-4 bg-white text-slate-900 space-y-4">
+            <!-- Header -->
+            <div class="flex justify-between items-center border-b-2 border-slate-900 pb-3">
+                <div class="text-right text-xs font-bold space-y-0.5">
+                    <p>المملكة العربية السعودية</p>
+                    <p>وزارة التعليم</p>
+                    <p>إدارة التعليم بمنطقة حائل</p>
+                    <p class="text-sm font-extrabold text-emerald-900">مدرسة ابن ماجه الابتدائية</p>
+                </div>
+                <div class="text-center">
+                    <h1 class="font-extrabold text-base border-b border-slate-800 pb-1">التقرير الإحصائي الرسمي لمتابعة الغياب</h1>
+                    <p id="printTimeframeSubtitle" class="text-xs font-bold text-slate-700 mt-1">الفترة: -</p>
+                </div>
+                <div class="text-left text-xs font-semibold space-y-0.5">
+                    <p>تاريخ الإصدار: <span id="printGeneratedDate"></span></p>
+                    <p>نطاق الفصل: <span id="printSelectedClassLabel">كافة الفصول</span></p>
+                </div>
+            </div>
+
+            <!-- Summary Table -->
+            <div>
+                <h3 class="font-bold text-xs mb-1 bg-slate-100 p-1 rounded border border-slate-300 text-slate-800">أولاً: ملخص المؤشرات الإحصائية العامة</h3>
+                <table class="w-full text-center text-xs border-collapse border border-slate-400">
+                    <thead>
+                        <tr class="bg-slate-200 font-bold">
+                            <th class="border border-slate-400 p-1.5">أيام الدراسة</th>
+                            <th class="border border-slate-400 p-1.5">إجمالي الطلاب</th>
+                            <th class="border border-slate-400 p-1.5">حالات الحضور</th>
+                            <th class="border border-slate-400 p-1.5">الغياب (بدون عذر)</th>
+                            <th class="border border-slate-400 p-1.5">الغياب بعذر</th>
+                            <th class="border border-slate-400 p-1.5">التأخر</th>
+                            <th class="border border-slate-400 p-1.5">نسبة الانضباط العامة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td id="printDaysCount" class="border border-slate-400 p-1.5 font-bold">0</td>
+                            <td id="printTotalStudents" class="border border-slate-400 p-1.5 font-bold">0</td>
+                            <td id="printPresentCount" class="border border-slate-400 p-1.5 font-bold text-emerald-800">0</td>
+                            <td id="printAbsentCount" class="border border-slate-400 p-1.5 font-bold text-rose-800">0</td>
+                            <td id="printExcusedCount" class="border border-slate-400 p-1.5 font-bold text-amber-800">0</td>
+                            <td id="printLateCount" class="border border-slate-400 p-1.5 font-bold text-purple-800">0</td>
+                            <td id="printRate" class="border border-slate-400 p-1.5 font-bold text-emerald-900">100%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Classes Comparative Breakdown -->
+            <div>
+                <h3 class="font-bold text-xs mb-1 bg-slate-100 p-1 rounded border border-slate-300 text-slate-800">ثانياً: تقرير مقارنة الفصول المدرسية</h3>
+                <table class="w-full text-right text-xs border-collapse border border-slate-400">
+                    <thead>
+                        <tr class="bg-slate-200 font-bold text-center">
+                            <th class="border border-slate-400 p-1 text-right">الفصل</th>
+                            <th class="border border-slate-400 p-1">عدد الطلاب</th>
+                            <th class="border border-slate-400 p-1">حالات الغياب</th>
+                            <th class="border border-slate-400 p-1">الغياب بعذر</th>
+                            <th class="border border-slate-400 p-1">التأخر</th>
+                            <th class="border border-slate-400 p-1">نسبة الانضباط</th>
+                        </tr>
+                    </thead>
+                    <tbody id="printClassesRankingTbody">
+                        <!-- Dynamic -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Top Absent Students List -->
+            <div>
+                <h3 class="font-bold text-xs mb-1 bg-slate-100 p-1 rounded border border-slate-300 text-slate-800">ثالثاً: الطلاب الأعلى تكراراً للغياب (للمتابعة والإجراء التربوي)</h3>
+                <table class="w-full text-right text-xs border-collapse border border-slate-400">
+                    <thead>
+                        <tr class="bg-slate-200 font-bold text-center">
+                            <th class="border border-slate-400 p-1 text-center">#</th>
+                            <th class="border border-slate-400 p-1 text-right">اسم الطالب</th>
+                            <th class="border border-slate-400 p-1">الفصل</th>
+                            <th class="border border-slate-400 p-1">رقم جوال ولي الأمر</th>
+                            <th class="border border-slate-400 p-1">مرات الغياب بدون عذر</th>
+                            <th class="border border-slate-400 p-1">مرات التأخر</th>
+                        </tr>
+                    </thead>
+                    <tbody id="printFrequentStudentsTbody">
+                        <!-- Dynamic -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Signatures Footer Block -->
+            <div class="pt-8 grid grid-cols-2 gap-8 text-center text-xs font-bold">
+                <div>
+                    <p class="mb-8">الموجه الطلابي</p>
+                    <p class="text-slate-400">التوقيع: ......................................................</p>
+                </div>
+                <div>
+                    <p class="mb-1">مدير المدرسة</p>
+                    <p class="text-emerald-900 font-extrabold mb-6">عبدالعزيز بن ناصر الحربي</p>
+                    <p class="text-slate-400">التوقيع والختم: ......................................................</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal: Dynamic Class Management -->
+    <div id="classManagerModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 no-print">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="bg-emerald-800 text-white p-3.5 flex justify-between items-center">
+                <h3 class="font-bold text-xs flex items-center gap-1.5">
+                    <i class="fa-solid fa-shapes"></i>
+                    إدارة الفصول المدرسية
+                </h3>
+                <button onclick="closeClassManager()" class="text-slate-200 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <div class="p-3.5 space-y-3 overflow-y-auto custom-scrollbar flex-grow text-xs">
+                <form onsubmit="handleAddCustomClass(event)" class="flex gap-2">
+                    <input type="text" id="newClassNameInput" placeholder="اسم الفصل الجديد (مثال: أول 4)" required class="flex-grow border border-slate-300 rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500">
+                    <button type="submit" class="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl">إضافة</button>
+                </form>
+
+                <div class="border border-slate-200 rounded-xl overflow-hidden">
+                    <table class="w-full text-right">
+                        <thead class="bg-slate-100 text-slate-700 font-bold">
+                            <tr>
+                                <th class="p-2">اسم الفصل</th>
+                                <th class="p-2 text-center">الطلاب</th>
+                                <th class="p-2 text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customClassesTableBody" class="divide-y divide-slate-100">
+                            <!-- Dynamic -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-2.5 border-t border-slate-100 flex justify-between items-center text-xs">
+                <button onclick="resetDefaultClasses()" class="text-rose-600 font-semibold">استعادة الفصول الـ 16 الافتراضية</button>
+                <button onclick="closeClassManager()" class="bg-slate-800 text-white font-semibold px-3 py-1 rounded-xl">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Simplified Add / Edit Student -->
+    <div id="studentModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 no-print">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden">
+            <div class="bg-slate-800 text-white p-3.5 flex justify-between items-center">
+                <h3 id="studentModalTitle" class="font-bold text-xs">إضافة طالب جديد</h3>
+                <button onclick="closeStudentModal()" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <form onsubmit="handleSaveStudent(event)" class="p-4 space-y-3 text-xs">
+                <input type="hidden" id="studentEditId">
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">اسم الطالب:</label>
+                    <input type="text" id="studentNameInput" placeholder="أدخل اسم الطالب الثلاثي/الرباعي" required class="w-full border border-slate-300 rounded-xl p-2 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">رقم جوال ولي الأمر:</label>
+                    <input type="tel" id="studentPhoneInput" placeholder="05xxxxxxxx" required class="w-full border border-slate-300 rounded-xl p-2 focus:outline-none focus:border-emerald-500" dir="ltr">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">الفصل:</label>
+                    <select id="studentClassSelect" required class="w-full border border-slate-300 rounded-xl p-2 focus:outline-none focus:border-emerald-500">
+                        <!-- Dynamic Options -->
+                    </select>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeStudentModal()" class="px-3 py-1.5 font-semibold bg-slate-100 text-slate-600 rounded-xl">إلغاء</button>
+                    <button type="submit" class="px-4 py-1.5 font-bold bg-emerald-600 text-white rounded-xl">حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Data Import Preview -->
+    <div id="importModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 no-print">
+        <div class="bg-white w-full max-w-xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div class="bg-emerald-700 text-white p-3.5 flex justify-between items-center">
+                <h3 class="font-bold text-xs flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i>
+                    معاينة استيراد الطلاب من Excel
+                </h3>
+                <button onclick="closeImportModal()" class="text-slate-200 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <div class="p-3.5 overflow-y-auto custom-scrollbar space-y-2 flex-grow text-xs">
+                <p id="importSummaryText" class="font-semibold text-slate-700"></p>
+                <div class="border rounded-xl overflow-hidden">
+                    <table class="w-full text-right">
+                        <thead class="bg-slate-100 text-slate-600 font-bold">
+                            <tr>
+                                <th class="p-2">اسم الطالب</th>
+                                <th class="p-2">رقم الجوال</th>
+                                <th class="p-2">الفصل</th>
+                            </tr>
+                        </thead>
+                        <tbody id="importPreviewTableBody" class="divide-y divide-slate-100">
+                            <!-- Preview -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="bg-slate-50 p-2.5 border-t border-slate-100 flex justify-between items-center text-xs">
+                <span class="text-slate-400">ملف مبسط (اسم الطالب + رقم الجوال)</span>
+                <div class="flex gap-2">
+                    <button onclick="closeImportModal()" class="px-3 py-1 font-semibold bg-slate-200 text-slate-700 rounded-xl">إلغاء</button>
+                    <button onclick="confirmImport()" class="px-4 py-1 font-bold bg-emerald-600 text-white rounded-xl">تأكيد الاستيراد</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Alert -->
+    <div id="toast" class="fixed bottom-5 left-5 bg-slate-800 text-white px-4 py-2.5 rounded-2xl shadow-xl text-xs flex items-center gap-2 transition-all transform translate-y-20 opacity-0 z-50 no-print">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">تمت العملية بنجاح</span>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // 16 Standard Classes
+        const DEFAULT_CLASSES = [
+            'أول 1', 'أول 2', 'أول 3',
+            'ثاني 1', 'ثاني 2',
+            'ثالث 1', 'ثالث 2',
+            'رابع 1', 'رابع 2', 'رابع 3',
+            'خامس 1', 'خامس 2', 'خامس 3',
+            'سادس 1', 'سادس 2', 'سادس 3'
+        ];
+
+        let activeClasses = [];
+        let studentsList = [];
+        let attendanceRecords = {};
+        let selectedClassFilter = "ALL";
+        let pendingImportData = [];
+        let activeTab = "attendanceTab";
+
+        let reportBarChartInstance = null;
+        let reportDoughnutChartInstance = null;
+
+        const SAMPLE_STUDENTS = [
+            { id: "1001", name: "محمد بن عبدالله الشمري", className: "أول 1", phone: "0501234567" },
+            { id: "1002", name: "خالد بن فهد التميمي", className: "أول 1", phone: "0559876543" },
+            { id: "1003", name: "سعود بن عبدالعزيز الرشيدي", className: "ثاني 1", phone: "0503332211" },
+            { id: "1004", name: "علي بن سلطان العنزي", className: "ثالث 2", phone: "0541122334" },
+            { id: "1005", name: "فهد بن ناصر الحربي", className: "رابع 1", phone: "0567788990" },
+            { id: "1006", name: "عمر بن يوسف القحطاني", className: "سادس 2", phone: "0509988776" }
+        ];
+
+        const MESSAGE_TEMPLATES = {
+            absent: "المكرم ولي أمر الطالب {{اسم_الطالب}} (فصل {{الفصل}})\nنفيدكم بأن ابنكم سجل غياباً بدون عذر بتاريخ {{التاريخ}}.\nنأمل الإفادة بالسبب لمصلحة ابنكم الدراسية.\nمدرسة ابن ماجه الابتدائية - حائل.",
+            excused: "المكرم ولي أمر الطالب {{اسم_الطالب}} (فصل {{الفصل}})\nتم قبول عذر غياب ابنكم المسجل بتاريخ {{التاريخ}}.\nشاكرين تعاونكم.\nمدرسة ابن ماجه الابتدائية.",
+            late: "المكرم ولي أمر الطالب {{اسم_الطالب}} (فصل {{الفصل}})\nنحيطكم علماً بتأخر ابنكم عن الحضور في الوقت المحدد بتاريخ {{التاريخ}}.\nيرجى حثه على الانتظام.\nمدرسة ابن ماجه الابتدائية."
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initDates();
+            loadClassesFromStorage();
+            loadStudentsFromStorage();
+            loadAttendanceFromStorage();
+            applyTemplate();
+            renderClassFilterButtons();
+            renderStudentsTable();
+            initReportCharts();
+        });
+
+        function initDates() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('selectedDate').value = today;
+            document.getElementById('reportDateFrom').value = today;
+            document.getElementById('reportDateTo').value = today;
+        }
+
+        function switchTab(tabId) {
+            activeTab = tabId;
+            document.getElementById('attendanceTab').classList.toggle('hidden', tabId !== 'attendanceTab');
+            document.getElementById('reportsTab').classList.toggle('hidden', tabId !== 'reportsTab');
+
+            const btnAtt = document.getElementById('btnTabAttendance');
+            const btnRep = document.getElementById('btnTabReports');
+
+            if (tabId === 'attendanceTab') {
+                btnAtt.className = "bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/30";
+                btnRep.className = "bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/20";
+                renderStudentsTable();
+            } else {
+                btnRep.className = "bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/30";
+                btnAtt.className = "bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/20";
+                populateReportClassDropdown();
+                generateReportData();
+            }
+        }
+
+        // --- Class Dynamic Management ---
+
+        function loadClassesFromStorage() {
+            const stored = localStorage.getItem('school_classes_simple');
+            if (stored) {
+                try { activeClasses = JSON.parse(stored); } catch (e) { activeClasses = [...DEFAULT_CLASSES]; }
+            } else {
+                activeClasses = [...DEFAULT_CLASSES];
+            }
+            saveClassesToStorage();
+        }
+
+        function saveClassesToStorage() {
+            localStorage.setItem('school_classes_simple', JSON.stringify(activeClasses));
+            populateClassDropdowns();
+            populateReportClassDropdown();
+            renderClassFilterButtons();
+        }
+
+        function openClassManager() {
+            renderCustomClassesTable();
+            document.getElementById('classManagerModal').classList.remove('hidden');
+        }
+
+        function closeClassManager() {
+            document.getElementById('classManagerModal').classList.add('hidden');
+        }
+
+        function handleAddCustomClass(e) {
+            e.preventDefault();
+            const input = document.getElementById('newClassNameInput');
+            const name = input.value.trim();
+            if (!name) return;
+
+            if (activeClasses.includes(name)) {
+                showToast("الفصل موجود بالفعل", "error");
+                return;
+            }
+
+            activeClasses.push(name);
+            saveClassesToStorage();
+            input.value = "";
+            renderCustomClassesTable();
+            showToast(`تمت إضافة الفصل (${name}) بنجاح`);
+        }
+
+        function renderCustomClassesTable() {
+            const tbody = document.getElementById('customClassesTableBody');
+            tbody.innerHTML = '';
+
+            activeClasses.forEach((cls) => {
+                const count = studentsList.filter(s => s.className === cls).length;
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-100 hover:bg-slate-50";
+
+                tr.innerHTML = `
+                    <td class="p-2 font-bold text-slate-800">${cls}</td>
+                    <td class="p-2 text-center font-semibold text-emerald-700">${count} طالب</td>
+                    <td class="p-2 text-center space-x-1 space-x-reverse">
+                        <button onclick="renameClassPrompt('${cls}')" class="text-blue-600 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="deleteCustomClass('${cls}', ${count})" class="text-rose-600 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renameClassPrompt(oldName) {
+            const newName = prompt(`تعديل اسم الفصل (${oldName}):`, oldName);
+            if (!newName || newName.trim() === "" || newName === oldName) return;
+            const cleaned = newName.trim();
+
+            const idx = activeClasses.indexOf(oldName);
+            if (idx !== -1) activeClasses[idx] = cleaned;
+
+            studentsList.forEach(s => { if (s.className === oldName) s.className = cleaned; });
+
+            saveStudentsToStorage();
+            saveClassesToStorage();
+            renderCustomClassesTable();
+            renderStudentsTable();
+            showToast(`تم تغيير مسمى الفصل إلى (${cleaned})`);
+        }
+
+        function deleteCustomClass(clsName, count) {
+            if (count > 0) {
+                showToast(`لا يمكن حذف الفصل لأنه يحتوي على ${count} طالب.`, "error");
+                return;
+            }
+            if (confirm(`حذف الفصل (${clsName})؟`)) {
+                activeClasses = activeClasses.filter(c => c !== clsName);
+                if (selectedClassFilter === clsName) selectedClassFilter = "ALL";
+                saveClassesToStorage();
+                renderCustomClassesTable();
+                renderStudentsTable();
+                showToast(`تم حذف الفصل (${clsName})`);
+            }
+        }
+
+        function resetDefaultClasses() {
+            if (confirm("استعادة قائمة الفصول الـ 16 الافتراضية؟")) {
+                activeClasses = [...DEFAULT_CLASSES];
+                studentsList.forEach(s => {
+                    if (s.className && !activeClasses.includes(s.className)) activeClasses.push(s.className);
+                });
+                saveClassesToStorage();
+                renderCustomClassesTable();
+                showToast("تم إرجاع الفصول الافتراضية");
+            }
+        }
+
+        function populateClassDropdowns() {
+            const selectAddModal = document.getElementById('studentClassSelect');
+            if (selectAddModal) {
+                selectAddModal.innerHTML = '';
+                activeClasses.forEach(cls => {
+                    const opt = document.createElement('option');
+                    opt.value = cls;
+                    opt.textContent = cls;
+                    selectAddModal.appendChild(opt);
+                });
+            }
+        }
+
+        function populateReportClassDropdown() {
+            const selectRep = document.getElementById('reportClassFilter');
+            if (!selectRep) return;
+            const currentVal = selectRep.value || "ALL";
+            selectRep.innerHTML = '<option value="ALL">جميع الفصول</option>';
+            activeClasses.forEach(cls => {
+                const opt = document.createElement('option');
+                opt.value = cls;
+                opt.textContent = cls;
+                selectRep.appendChild(opt);
+            });
+            selectRep.value = currentVal;
+        }
+
+        function renderClassFilterButtons() {
+            const container = document.getElementById('classFilterContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const allBtn = document.createElement('button');
+            allBtn.onclick = () => filterByClass('ALL');
+            allBtn.className = `px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition ${selectedClassFilter === 'ALL' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+            allBtn.textContent = `الكل (${studentsList.length})`;
+            container.appendChild(allBtn);
+
+            activeClasses.forEach(cls => {
+                const count = studentsList.filter(s => s.className === cls).length;
+                const btn = document.createElement('button');
+                btn.onclick = () => filterByClass(cls);
+                btn.className = `px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition ${selectedClassFilter === cls ? 'bg-emerald-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+                btn.textContent = `${cls} (${count})`;
+                container.appendChild(btn);
+            });
+        }
+
+        function filterByClass(clsName) {
+            selectedClassFilter = clsName;
+            renderClassFilterButtons();
+            renderStudentsTable();
+        }
+
+        // --- Data Persistence ---
+
+        function loadStudentsFromStorage() {
+            const stored = localStorage.getItem('school_students_simple');
+            if (stored) {
+                try { studentsList = JSON.parse(stored); } catch (e) { studentsList = [...SAMPLE_STUDENTS]; }
+            } else {
+                studentsList = [...SAMPLE_STUDENTS];
+                saveStudentsToStorage();
+            }
+            studentsList.forEach(s => {
+                if (s.className && !activeClasses.includes(s.className)) activeClasses.push(s.className);
+            });
+            saveClassesToStorage();
+        }
+
+        function saveStudentsToStorage() {
+            localStorage.setItem('school_students_simple', JSON.stringify(studentsList));
+            renderClassFilterButtons();
+        }
+
+        function loadAttendanceFromStorage() {
+            const stored = localStorage.getItem('school_attendance_simple');
+            if (stored) {
+                try { attendanceRecords = JSON.parse(stored); } catch (e) { attendanceRecords = {}; }
+            }
+        }
+
+        function saveAttendanceToStorage() {
+            localStorage.setItem('school_attendance_simple', JSON.stringify(attendanceRecords));
+        }
+
+        function getStudentStatusOnDate(studentId, dateStr) {
+            if (attendanceRecords[dateStr] && attendanceRecords[dateStr][studentId]) {
+                return attendanceRecords[dateStr][studentId];
+            }
+            return "حاضر";
+        }
+
+        function setStudentStatus(studentId, status) {
+            const dateStr = document.getElementById('selectedDate').value;
+            if (!attendanceRecords[dateStr]) attendanceRecords[dateStr] = {};
+            attendanceRecords[dateStr][studentId] = status;
+            saveAttendanceToStorage();
+            renderStudentsTable();
+        }
+
+        function onDateChange() {
+            renderStudentsTable();
+        }
+
+        // --- Table Render ---
+
+        function renderStudentsTable() {
+            const tbody = document.getElementById('studentsTableBody');
+            const emptyState = document.getElementById('emptyState');
+            const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+            const statusVal = document.getElementById('statusFilter').value;
+            const currentDateStr = document.getElementById('selectedDate').value;
+
+            tbody.innerHTML = '';
+
+            let filtered = studentsList.filter(student => {
+                if (selectedClassFilter !== "ALL" && student.className !== selectedClassFilter) return false;
+                if (searchVal && !student.name.toLowerCase().includes(searchVal)) return false;
+
+                const currentStatus = getStudentStatusOnDate(student.id, currentDateStr);
+                if (statusVal !== "ALL" && currentStatus !== statusVal) return false;
+                return true;
+            });
+
+            if (filtered.length === 0) emptyState.classList.remove('hidden');
+            else emptyState.classList.add('hidden');
+
+            let presentCount = 0, absentCount = 0, excusedCount = 0, lateCount = 0;
+            const visibleInFilterClassList = selectedClassFilter === "ALL" 
+                ? studentsList 
+                : studentsList.filter(s => s.className === selectedClassFilter);
+
+            visibleInFilterClassList.forEach(s => {
+                const st = getStudentStatusOnDate(s.id, currentDateStr);
+                if (st === 'حاضر') presentCount++;
+                else if (st === 'غائب') absentCount++;
+                else if (st === 'غائب بعذر') excusedCount++;
+                else if (st === 'متأخر') lateCount++;
+            });
+
+            document.getElementById('statTotal').textContent = visibleInFilterClassList.length;
+            document.getElementById('statPresent').textContent = presentCount;
+            document.getElementById('statAbsent').textContent = absentCount;
+            document.getElementById('statExcusedLate').textContent = excusedCount + lateCount;
+
+            filtered.forEach((student) => {
+                const status = getStudentStatusOnDate(student.id, currentDateStr);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+
+                tr.innerHTML = `
+                    <td class="py-2.5 px-3 font-bold text-slate-800">${student.name}</td>
+                    <td class="py-2.5 px-3 text-slate-600 font-sans" dir="ltr">${student.phone || '-'}</td>
+                    <td class="py-2.5 px-3">
+                        <span class="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[10px]">${student.className}</span>
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                        <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+                            <button onclick="setStudentStatus('${student.id}', 'حاضر')" class="px-2 py-0.5 text-[10px] font-bold rounded transition ${status === 'حاضر' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}">حاضر</button>
+                            <button onclick="setStudentStatus('${student.id}', 'غائب')" class="px-2 py-0.5 text-[10px] font-bold rounded transition ${status === 'غائب' ? 'bg-rose-600 text-white' : 'text-slate-600 hover:bg-slate-100'}">غائب</button>
+                            <button onclick="setStudentStatus('${student.id}', 'غائب بعذر')" class="px-2 py-0.5 text-[10px] font-bold rounded transition ${status === 'غائب بعذر' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:bg-slate-100'}">بعذر</button>
+                            <button onclick="setStudentStatus('${student.id}', 'متأخر')" class="px-2 py-0.5 text-[10px] font-bold rounded transition ${status === 'متأخر' ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-slate-100'}">متأخر</button>
+                        </div>
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                        <button onclick="sendSingleWhatsApp('${student.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg font-bold text-[10px] transition inline-flex items-center gap-1 border border-emerald-200">
+                            <i class="fa-brands fa-whatsapp text-emerald-600"></i>
+                            <span>واتساب</span>
+                        </button>
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                        <div class="flex justify-center items-center gap-1">
+                            <button onclick="openEditStudentModal('${student.id}')" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteStudent('${student.id}')" class="text-rose-400 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- Student Operations ---
+
+        function openAddStudentModal() {
+            populateClassDropdowns();
+            document.getElementById('studentModalTitle').textContent = "إضافة طالب جديد";
+            document.getElementById('studentEditId').value = "";
+            document.getElementById('studentNameInput').value = "";
+            document.getElementById('studentPhoneInput').value = "";
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function openEditStudentModal(id) {
+            const student = studentsList.find(s => s.id === id);
+            if (!student) return;
+
+            populateClassDropdowns();
+            document.getElementById('studentModalTitle').textContent = "تعديل بيانات الطالب";
+            document.getElementById('studentEditId').value = student.id;
+            document.getElementById('studentNameInput').value = student.name;
+            document.getElementById('studentClassSelect').value = student.className;
+            document.getElementById('studentPhoneInput').value = student.phone || "";
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function closeStudentModal() {
+            document.getElementById('studentModal').classList.add('hidden');
+        }
+
+        function handleSaveStudent(e) {
+            e.preventDefault();
+            const editId = document.getElementById('studentEditId').value;
+            const name = document.getElementById('studentNameInput').value.trim();
+            const className = document.getElementById('studentClassSelect').value;
+            const phone = document.getElementById('studentPhoneInput').value.trim();
+
+            if (!name || !className) return;
+
+            if (editId) {
+                const student = studentsList.find(s => s.id === editId);
+                if (student) {
+                    student.name = name;
+                    student.className = className;
+                    student.phone = phone;
+                }
+                showToast("تم تحديث بيانات الطالب");
+            } else {
+                studentsList.push({
+                    id: "ST" + Date.now().toString().slice(-6),
+                    name,
+                    className,
+                    phone
+                });
+                showToast("تمت إضافة الطالب الجديد");
+            }
+
+            saveStudentsToStorage();
+            closeStudentModal();
+            renderStudentsTable();
+        }
+
+        function deleteStudent(id) {
+            if (confirm("حذف الطالب من السجل؟")) {
+                studentsList = studentsList.filter(s => s.id !== id);
+                saveStudentsToStorage();
+                renderStudentsTable();
+                showToast("تم الحذف");
+            }
+        }
+
+        // --- WhatsApp Integration ---
+
+        function applyTemplate() {
+            const type = document.getElementById('templateSelect').value;
+            if (MESSAGE_TEMPLATES[type]) {
+                document.getElementById('messageTemplateText').value = MESSAGE_TEMPLATES[type];
+            }
+        }
+
+        function buildMessageForStudent(student, dateStr) {
+            let template = document.getElementById('messageTemplateText').value;
+            const status = getStudentStatusOnDate(student.id, dateStr);
+
+            return template
+                .replace(/{{اسم_الطالب}}/g, student.name)
+                .replace(/{{الفصل}}/g, student.className)
+                .replace(/{{التاريخ}}/g, dateStr)
+                .replace(/{{حالة_الغياب}}/g, status);
+        }
+
+        function cleanPhoneNumber(phone) {
+            if (!phone) return null;
+            let cleaned = phone.replace(/\D/g, '');
+            if (cleaned.startsWith('05')) cleaned = '966' + cleaned.substring(1);
+            return cleaned.length >= 9 ? cleaned : null;
+        }
+
+        function sendSingleWhatsApp(studentId) {
+            const student = studentsList.find(s => s.id === studentId);
+            if (!student) return;
+
+            const phone = cleanPhoneNumber(student.phone);
+            if (!phone) {
+                showToast("رقم الجوال غير صحيح أو غائب", "error");
+                return;
+            }
+
+            const dateStr = document.getElementById('selectedDate').value;
+            const msg = buildMessageForStudent(student, dateStr);
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        function sendBatchWhatsApp(targetStatus) {
+            const dateStr = document.getElementById('selectedDate').value;
+            const targets = studentsList.filter(s => {
+                if (selectedClassFilter !== "ALL" && s.className !== selectedClassFilter) return false;
+                return getStudentStatusOnDate(s.id, dateStr) === targetStatus;
+            });
+
+            if (targets.length === 0) {
+                showToast(`لا يوجد طلاب بحالة (${targetStatus})`, "error");
+                return;
+            }
+
+            if (confirm(`إرسال رسائل واتساب إلى (${targets.length}) طالب؟`)) {
+                targets.forEach((student, index) => {
+                    setTimeout(() => {
+                        const phone = cleanPhoneNumber(student.phone);
+                        if (phone) {
+                            const msg = buildMessageForStudent(student, dateStr);
+                            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                        }
+                    }, index * 800);
+                });
+            }
+        }
+
+        // --- Excel Import & Template ---
+
+        function downloadSimplifiedExcelTemplate() {
+            const wb = XLSX.utils.book_new();
+
+            activeClasses.forEach(clsName => {
+                const sheetData = [
+                    ["اسم الطالب", "رقم الجوال"],
+                    ["أحمد محمد الشمري", "0501234567"],
+                    ["خالد عبدالسلام التميمي", "0559876543"]
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(sheetData);
+                const safeSheetName = clsName.replace(/[:\\/?*\[\]]/g, " ").substring(0, 30);
+                XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+            });
+
+            XLSX.writeFile(wb, `نموذج_طلاب_ابن_ماجه_مبسط.xlsx`);
+            showToast("تم تحميل النموذج المبسط (عمودين فقط)");
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    pendingImportData = [];
+
+                    workbook.SheetNames.forEach(sheetName => {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        const inferredClass = sheetName.trim();
+
+                        if (json.length > 1) {
+                            for (let i = 1; i < json.length; i++) {
+                                const row = json[i];
+                                if (!row || row.length === 0 || !row[0]) continue;
+
+                                const studentName = String(row[0]).trim();
+                                const phone = row[1] ? String(row[1]).trim() : '';
+                                const className = row[2] ? String(row[2]).trim() : inferredClass;
+
+                                if (studentName && !studentName.includes("أحمد محمد الشمري")) {
+                                    pendingImportData.push({
+                                        name: studentName,
+                                        phone: phone,
+                                        className: className
+                                    });
+                                }
+                            }
+                        }
+                    });
+
+                    if (pendingImportData.length === 0) {
+                        showToast("لم يتم العثور على طلاب في الملف", "error");
+                        return;
+                    }
+
+                    showImportPreview();
+                } catch (err) {
+                    showToast("خطأ أثناء قراءة ملف Excel", "error");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+        }
+
+        function showImportPreview() {
+            document.getElementById('importSummaryText').textContent = `اكتشاف (${pendingImportData.length}) طالب في الملف.`;
+            const tbody = document.getElementById('importPreviewTableBody');
+            tbody.innerHTML = '';
+
+            pendingImportData.slice(0, 8).forEach(st => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-100";
+                tr.innerHTML = `
+                    <td class="p-2 font-bold">${st.name}</td>
+                    <td class="p-2 font-sans" dir="ltr">${st.phone || '-'}</td>
+                    <td class="p-2"><span class="bg-slate-100 px-2 py-0.5 rounded text-[10px]">${st.className}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('importModal').classList.remove('hidden');
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').classList.add('hidden');
+        }
+
+        function confirmImport() {
+            let addedCount = 0;
+            pendingImportData.forEach(st => {
+                if (st.className && !activeClasses.includes(st.className)) activeClasses.push(st.className);
+
+                const exists = studentsList.some(existing => existing.name === st.name && existing.className === st.className);
+
+                if (!exists) {
+                    studentsList.push({
+                        id: "ST" + Date.now().toString().slice(-6) + Math.floor(Math.random() * 100),
+                        name: st.name,
+                        phone: st.phone,
+                        className: st.className
+                    });
+                    addedCount++;
+                }
+            });
+
+            saveClassesToStorage();
+            saveStudentsToStorage();
+            closeImportModal();
+            renderStudentsTable();
+            showToast(`تم استيراد ${addedCount} طالب بنجاح`);
+        }
+
+        function exportAnalyticsExcel() {
+            const dateStr = document.getElementById('selectedDate').value;
+            const exportData = studentsList.map((s, idx) => ({
+                "م": idx + 1,
+                "اسم الطالب": s.name,
+                "رقم الجوال": s.phone || '',
+                "الفصل": s.className,
+                "حالة الحضور": getStudentStatusOnDate(s.id, dateStr),
+                "التاريخ": dateStr
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الغياب_اليومي");
+            XLSX.writeFile(wb, `حضور_طلاب_ابن_ماجه_${dateStr}.xlsx`);
+            showToast("تم تصدير كشف الحضور إلى ملف Excel");
+        }
+
+        // --- ADVANCED REPORTING & TIMEFRAME CALCULATIONS ---
+
+        function onTimeframeTypeChange() {
+            const type = document.getElementById('timeframeType').value;
+            const fromContainer = document.getElementById('dateFromContainer');
+            const toContainer = document.getElementById('dateToContainer');
+            const fromLabel = document.getElementById('dateFromLabel');
+
+            const today = new Date();
+
+            if (type === 'daily') {
+                fromContainer.classList.remove('hidden');
+                toContainer.classList.add('hidden');
+                fromLabel.textContent = "التاريخ:";
+                document.getElementById('reportDateFrom').value = today.toISOString().split('T')[0];
+            } else if (type === 'weekly') {
+                fromContainer.classList.remove('hidden');
+                toContainer.classList.remove('hidden');
+                fromLabel.textContent = "من تاريخ (بداية الأسبوع):";
+
+                // Set Sunday to Thursday week
+                const day = today.getDay(); // 0 is Sunday
+                const sun = new Date(today);
+                sun.setDate(today.getDate() - day);
+                const thu = new Date(sun);
+                thu.setDate(sun.getDate() + 4);
+
+                document.getElementById('reportDateFrom').value = sun.toISOString().split('T')[0];
+                document.getElementById('reportDateTo').value = thu.toISOString().split('T')[0];
+            } else if (type === 'monthly') {
+                fromContainer.classList.remove('hidden');
+                toContainer.classList.remove('hidden');
+                fromLabel.textContent = "من بداية الشهر:";
+
+                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+                document.getElementById('reportDateFrom').value = firstDay.toISOString().split('T')[0];
+                document.getElementById('reportDateTo').value = lastDay.toISOString().split('T')[0];
+            } else if (type === 'custom') {
+                fromContainer.classList.remove('hidden');
+                toContainer.classList.remove('hidden');
+                fromLabel.textContent = "من تاريخ:";
+            }
+
+            generateReportData();
+        }
+
+        function getDateRangeArray(startDateStr, endDateStr) {
+            const dates = [];
+            let curr = new Date(startDateStr);
+            const end = new Date(endDateStr);
+
+            while (curr <= end) {
+                dates.push(curr.toISOString().split('T')[0]);
+                curr.setDate(curr.getDate() + 1);
+            }
+            return dates;
+        }
+
+        function generateReportData() {
+            const timeframeType = document.getElementById('timeframeType').value;
+            const dateFrom = document.getElementById('reportDateFrom').value;
+            const dateTo = document.getElementById('reportDateTo').value;
+            const selectedClass = document.getElementById('reportClassFilter').value;
+
+            let targetDates = [];
+            if (timeframeType === 'daily') {
+                targetDates = [dateFrom];
+            } else {
+                targetDates = getDateRangeArray(dateFrom, dateTo);
+            }
+
+            // Filter relevant saved dates in attendanceRecords
+            const recordedDates = targetDates.filter(d => attendanceRecords[d] !== undefined);
+            const activeDaysCount = recordedDates.length > 0 ? recordedDates.length : (targetDates.length > 0 ? 1 : 0);
+
+            let filteredStudents = studentsList;
+            if (selectedClass !== 'ALL') {
+                filteredStudents = studentsList.filter(s => s.className === selectedClass);
+            }
+
+            let totalPresent = 0;
+            let totalAbsent = 0;
+            let totalExcused = 0;
+            let totalLate = 0;
+
+            // Student absence counter map
+            const studentCounters = {};
+            filteredStudents.forEach(s => {
+                studentCounters[s.id] = { student: s, absent: 0, late: 0, excused: 0 };
+            });
+
+            targetDates.forEach(d => {
+                filteredStudents.forEach(s => {
+                    const st = getStudentStatusOnDate(s.id, d);
+                    if (st === 'حاضر') totalPresent++;
+                    else if (st === 'غائب') {
+                        totalAbsent++;
+                        if (studentCounters[s.id]) studentCounters[s.id].absent++;
+                    } else if (st === 'غائب بعذر') {
+                        totalExcused++;
+                        if (studentCounters[s.id]) studentCounters[s.id].excused++;
+                    } else if (st === 'متأخر') {
+                        totalLate++;
+                        if (studentCounters[s.id]) studentCounters[s.id].late++;
+                    }
+                });
+            });
+
+            const totalRecords = totalPresent + totalAbsent + totalExcused + totalLate;
+            const disciplineRate = totalRecords > 0 ? (((totalPresent + totalExcused) / totalRecords) * 100).toFixed(1) : 100;
+
+            // Update UI Cards
+            document.getElementById('repDaysCount').textContent = activeDaysCount;
+            document.getElementById('repTotalRecords').textContent = totalRecords;
+            document.getElementById('repAttendanceRate').textContent = disciplineRate + "%";
+            document.getElementById('repAbsentCount').textContent = totalAbsent;
+            document.getElementById('repExcusedCount').textContent = totalExcused;
+            document.getElementById('repLateCount').textContent = totalLate;
+
+            // Update Print Summary Metrics
+            document.getElementById('printDaysCount').textContent = activeDaysCount;
+            document.getElementById('printTotalStudents').textContent = filteredStudents.length;
+            document.getElementById('printPresentCount').textContent = totalPresent;
+            document.getElementById('printAbsentCount').textContent = totalAbsent;
+            document.getElementById('printExcusedCount').textContent = totalExcused;
+            document.getElementById('printLateCount').textContent = totalLate;
+            document.getElementById('printRate').textContent = disciplineRate + "%";
+
+            // Format Period Subtitle
+            let timeframeSubtitle = "";
+            if (timeframeType === 'daily') timeframeSubtitle = `يوم (${dateFrom})`;
+            else timeframeSubtitle = `من تاريخ ${dateFrom} إلى ${dateTo}`;
+            document.getElementById('printTimeframeSubtitle').textContent = `الفترة: ${timeframeSubtitle}`;
+            document.getElementById('printGeneratedDate').textContent = new Date().toISOString().split('T')[0];
+            document.getElementById('printSelectedClassLabel').textContent = selectedClass === 'ALL' ? 'كافة الفصول' : selectedClass;
+
+            // Populate Class Rankings
+            renderClassRankingsAndCharts(targetDates);
+
+            // Populate Top Absent Students
+            renderFrequentAbsenceWatchlist(studentCounters);
+        }
+
+        function renderClassRankingsAndCharts(targetDates) {
+            const rankingTbody = document.getElementById('classRankingTableBody');
+            const printRankingTbody = document.getElementById('printClassesRankingTbody');
+            rankingTbody.innerHTML = '';
+            printRankingTbody.innerHTML = '';
+
+            const classStats = [];
+
+            activeClasses.forEach(cls => {
+                const clsStudents = studentsList.filter(s => s.className === cls);
+                let p = 0, a = 0, e = 0, l = 0;
+
+                targetDates.forEach(d => {
+                    clsStudents.forEach(s => {
+                        const st = getStudentStatusOnDate(s.id, d);
+                        if (st === 'حاضر') p++;
+                        else if (st === 'غائب') a++;
+                        else if (st === 'غائب بعذر') e++;
+                        else if (st === 'متأخر') l++;
+                    });
+                });
+
+                const total = p + a + e + l;
+                const rate = total > 0 ? (((p + e) / total) * 100).toFixed(1) : 100;
+
+                classStats.push({
+                    className: cls,
+                    studentCount: clsStudents.length,
+                    present: p,
+                    absent: a,
+                    excused: e,
+                    late: l,
+                    rate: parseFloat(rate)
+                });
+            });
+
+            // Sort by absence descending
+            classStats.sort((a, b) => b.absent - a.absent);
+
+            classStats.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 border-b border-slate-100";
+                tr.innerHTML = `
+                    <td class="p-2 font-bold text-slate-800">${item.className}</td>
+                    <td class="p-2 text-center text-slate-600 font-semibold">${item.studentCount}</td>
+                    <td class="p-2 text-center text-rose-700 font-extrabold">${item.absent}</td>
+                    <td class="p-2 text-center text-amber-700 font-semibold">${item.excused}</td>
+                    <td class="p-2 text-center font-bold text-emerald-700">${item.rate}%</td>
+                `;
+                rankingTbody.appendChild(tr);
+
+                const printTr = document.createElement('tr');
+                printTr.className = "border-b border-slate-400 text-center";
+                printTr.innerHTML = `
+                    <td class="border border-slate-400 p-1 font-bold text-right">${item.className}</td>
+                    <td class="border border-slate-400 p-1">${item.studentCount}</td>
+                    <td class="border border-slate-400 p-1 font-bold text-rose-800">${item.absent}</td>
+                    <td class="border border-slate-400 p-1 font-bold text-amber-800">${item.excused}</td>
+                    <td class="border border-slate-400 p-1 font-bold text-purple-800">${item.late}</td>
+                    <td class="border border-slate-400 p-1 font-bold text-emerald-900">${item.rate}%</td>
+                `;
+                printRankingTbody.appendChild(printTr);
+            });
+
+            // Update Chart.js Instance
+            updateReportCharts(classStats);
+        }
+
+        function renderFrequentAbsenceWatchlist(studentCounters) {
+            const tbody = document.getElementById('frequentAbsenceTableBody');
+            const printTbody = document.getElementById('printFrequentStudentsTbody');
+            tbody.innerHTML = '';
+            printTbody.innerHTML = '';
+
+            const list = Object.values(studentCounters)
+                .filter(item => item.absent > 0 || item.late > 0)
+                .sort((a, b) => b.absent - a.absent || b.late - a.late);
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400 font-semibold">لا يوجد حالات غياب مسجلة خلال هذه الفترة</td></tr>`;
+                printTbody.innerHTML = `<tr><td colspan="6" class="border border-slate-400 p-2 text-center text-slate-500">لا يوجد حالات غياب مسجلة خلال هذه الفترة</td></tr>`;
+                return;
+            }
+
+            list.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 border-b border-slate-100";
+                tr.innerHTML = `
+                    <td class="p-2 font-bold text-slate-800">${item.student.name}</td>
+                    <td class="p-2"><span class="bg-slate-100 font-bold px-2 py-0.5 rounded text-[10px]">${item.student.className}</span></td>
+                    <td class="p-2 text-center font-extrabold text-rose-600">${item.absent} مرة</td>
+                    <td class="p-2 text-center font-bold text-purple-600">${item.late} مرة</td>
+                `;
+                tbody.appendChild(tr);
+
+                const printTr = document.createElement('tr');
+                printTr.className = "border-b border-slate-400 text-center";
+                printTr.innerHTML = `
+                    <td class="border border-slate-400 p-1 font-bold">${index + 1}</td>
+                    <td class="border border-slate-400 p-1 text-right font-bold">${item.student.name}</td>
+                    <td class="border border-slate-400 p-1">${item.student.className}</td>
+                    <td class="border border-slate-400 p-1 font-sans" dir="ltr">${item.student.phone || '-'}</td>
+                    <td class="border border-slate-400 p-1 font-extrabold text-rose-800">${item.absent}</td>
+                    <td class="border border-slate-400 p-1 font-bold text-purple-800">${item.late}</td>
+                `;
+                printTbody.appendChild(printTr);
+            });
+        }
+
+        // --- REPORT CHARTS ---
+
+        function initReportCharts() {
+            const ctxBar = document.getElementById('reportClassesBarChart').getContext('2d');
+            reportBarChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'حالات الغياب', data: [], backgroundColor: '#f43f5e' },
+                        { label: 'حالات التأخر', data: [], backgroundColor: '#a855f7' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { family: 'Cairo', size: 11 } } }
+                    },
+                    scales: {
+                        x: { ticks: { font: { family: 'Cairo', size: 10 } } },
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+
+            const ctxDoughnut = document.getElementById('reportDoughnutChart').getContext('2d');
+            reportDoughnutChartInstance = new Chart(ctxDoughnut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['حاضر', 'غائب بدون عذر', 'غائب بعذر', 'متأخر'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#22c55e', '#f43f5e', '#f59e0b', '#a855f7']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { family: 'Cairo', size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function updateReportCharts(classStats) {
+            if (!reportBarChartInstance || !reportDoughnutChartInstance) return;
+
+            const labels = classStats.map(c => c.className);
+            const absentArr = classStats.map(c => c.absent);
+            const lateArr = classStats.map(c => c.late);
+
+            reportBarChartInstance.data.labels = labels;
+            reportBarChartInstance.data.datasets[0].data = absentArr;
+            reportBarChartInstance.data.datasets[1].data = lateArr;
+            reportBarChartInstance.update();
+
+            let totalP = 0, totalA = 0, totalE = 0, totalL = 0;
+            classStats.forEach(c => {
+                totalP += c.present;
+                totalA += c.absent;
+                totalE += c.excused;
+                totalL += c.late;
+            });
+
+            reportDoughnutChartInstance.data.datasets[0].data = [totalP, totalA, totalE, totalL];
+            reportDoughnutChartInstance.update();
+        }
+
+        function printOfficialReport() {
+            window.print();
+        }
+
+        function showToast(msg, type = "success") {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+
+            document.getElementById('toastIcon').className = type === "error" 
+                ? "fa-solid fa-circle-exclamation text-rose-400 text-base"
+                : "fa-solid fa-circle-check text-emerald-400 text-base";
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
